@@ -1,0 +1,38 @@
+# Data files (too large for git)
+cortex-export.json
+cortex-fresh-export.json
+
+# Node
+node_modules/
+package-lock.json
+
+# Shell scripts (ops/debug tooling, not part of graph)
+*.sh
+
+# Temp/debug scripts
+check_suggestions.py
+decode_qr.py
+ws-test.js
+extract-qr.js
+scan-whatsapp.ps1
+watch-cortex.ps1
+
+# Old/intermediate HTML
+cortex-explorer.html
+cortex-live.html
+lily-cortex-surge.html
+
+# OpenClaw config
+openclaw.json
+
+# WhatsApp QR artifacts
+qr-now.txt
+qr-output.txt
+whatsapp-qr.bmp
+
+# Cloud Function (separate deploy)
+suggestion-fn/
+
+# OS
+Thumbs.db
+.DS_Store
