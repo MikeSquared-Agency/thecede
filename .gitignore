@@ -33,6 +33,11 @@ whatsapp-qr.bmp
 # Cloud Function (separate deploy)
 suggestion-fn/
 
+# Foundry build artifacts & dependencies
+contracts/lib/
+contracts/out/
+contracts/cache/
+
 # OS
 Thumbs.db
 .DS_Store
