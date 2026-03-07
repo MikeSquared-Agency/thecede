@@ -149,8 +149,8 @@ python build-lily-graph.py
 
 | Repo | Description |
 |---|---|
-| **Xbot** | Lily's X (Twitter) automation agent — outreach, engagement, content scheduling |
-| **Cortex** | The graph database runtime that stores Lily's persistent memory (nodes + edges) |
+| [**Xbot**](https://github.com/MikeSquared-Agency/xbot) | Lily's X (Twitter) automation agent — outreach, engagement, content scheduling |
+| [**Cortex**](https://github.com/MikeSquared-Agency/cortex) | The graph database runtime that stores Lily's persistent memory (nodes + edges) |
 
 ---
 
