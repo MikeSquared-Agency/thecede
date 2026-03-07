@@ -37,6 +37,8 @@ suggestion-fn/
 contracts/lib/
 contracts/out/
 contracts/cache/
+contracts/.env
+contracts/broadcast/
 
 # OS
 Thumbs.db
