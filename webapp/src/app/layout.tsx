@@ -15,8 +15,8 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cortex · Graph Explorer",
-  description: "Interactive knowledge graph explorer for Cortex memory engine",
+  title: "thecede",
+  description: "Real-time knowledge graph explorer powered by Cortex",
 };
 
 export default function RootLayout({

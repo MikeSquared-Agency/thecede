@@ -48,7 +48,7 @@ export function CortexHeader() {
         <Link href="/" className="flex items-center gap-1.5 pr-4 mr-1 border-r border-border">
           <span className="text-sm">🧠</span>
           <span className="font-mono text-[11px] font-semibold text-primary tracking-tight">
-            cortex
+            thecede
           </span>
           {serverInfo && (
             <span className="font-mono text-[9px] text-muted-foreground/50 tracking-tight">

@@ -30,10 +30,10 @@ export default function AboutPage() {
                 letterSpacing: "-0.03em",
               }}
             >
-              Cortex Graph Explorer
+              thecede
             </h1>
             <p className="text-sm text-muted-foreground leading-[1.85] max-w-[580px]">
-              A real-time interactive visualization of a live Cortex knowledge
+              A real-time interactive visualization of a live knowledge
               graph. Every dot is a node — a fact, a rule, a decision, an
               observation. Every line is a connection the agent discovered or
               created. This is not a demo. It&apos;s the actual graph, rendered
@@ -46,7 +46,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* What is Cortex */}
+        {/* What is thecede */}
         <section className="flex flex-col gap-3">
           <span className="font-mono text-[0.62rem] uppercase tracking-[0.12em] text-muted-foreground">
             01
@@ -55,14 +55,14 @@ export default function AboutPage() {
             className="text-[1.2rem] font-bold text-foreground"
             style={{ letterSpacing: "-0.01em" }}
           >
-            What Cortex is
+            What thecede is
           </h2>
           <div className="flex flex-col gap-3 text-[0.88rem] text-muted-foreground leading-[1.9]">
             <p>
-              Cortex is an embedded graph memory engine for AI agents. It runs
-              locally as a single binary — no cloud, no external database. Agents
-              write nodes and edges during work. At the start of every session,
-              they search Cortex to recover full context in seconds.
+              thecede is a real-time graph explorer built on top of Cortex, an
+              embedded graph memory engine for AI agents. Cortex runs locally as
+              a single binary — no cloud, no external database. Agents write
+              nodes and edges during work. thecede visualizes this live.
             </p>
             <p>
               The graph stores facts, rules, decisions, tasks, patterns,
@@ -126,8 +126,8 @@ export default function AboutPage() {
           ) : (
             <p className="text-[0.88rem] text-muted-foreground leading-[1.9]">
               {status === "connected"
-                ? "No nodes in the graph yet. Create some with the Cortex API or CLI."
-                : "Connect to a Cortex server to see what's in the graph."}
+                ? "No nodes in the graph yet. Create some with the API or CLI."
+                : "Connect to a server to see what\u2019s in the graph."}
             </p>
           )}
         </section>

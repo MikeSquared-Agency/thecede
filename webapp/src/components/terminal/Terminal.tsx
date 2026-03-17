@@ -6,10 +6,11 @@ import { Terminal as TerminalIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGraphStore } from "@/lib/stores/graphStore";
 
-const ASCII_BANNER = `  ___  __  __  ____  ____  _  _
- / __)/  \(  )(  _ \(_  _)( \/ )
-( (__(  O ))(  )   /  )(   )  /
- \___)\_\/(__)(_)\_) (__) (_/\_)  `;
+const ASCII_BANNER = ` _   _                        _
+| |_| |__   ___  ___ ___  __| | ___
+| __| '_ \\ / _ \\/ __/ _ \\/ _\` |/ _ \\
+| |_| | | |  __/ (_|  __/ (_| |  __/
+ \\__|_| |_|\\___|\\___|\\___|\\_\\_,_|\\___|`;
 
 interface TerminalLine {
   id: number;
@@ -25,7 +26,7 @@ interface TerminalProps {
 export function Terminal({ className }: TerminalProps) {
   const [lines, setLines] = useState<TerminalLine[]>([
     { id: 0, type: "ascii", content: ASCII_BANNER, timestamp: new Date() },
-    { id: 1, type: "system", content: "Cortex Graph Explorer v0.2.0", timestamp: new Date() },
+    { id: 1, type: "system", content: "thecede v0.2.0", timestamp: new Date() },
     { id: 2, type: "output", content: "Type 'help' for commands.", timestamp: new Date() },
   ]);
   const [input, setInput] = useState("");
@@ -68,7 +69,7 @@ export function Terminal({ className }: TerminalProps) {
         addLine("output", "  filter    - Filter by node type");
         addLine("output", "  select    - Select node by partial title");
         addLine("output", "  stats     - Graph statistics");
-        addLine("output", "  reconnect - Reconnect to Cortex server");
+        addLine("output", "  reconnect - Reconnect to server");
         addLine("output", "  history   - Show command history");
         break;
 
@@ -77,7 +78,7 @@ export function Terminal({ className }: TerminalProps) {
         break;
 
       case "status":
-        addLine("output", "Cortex Status:");
+        addLine("output", "Status:");
         addLine("output", `  Connection: ${status.toUpperCase()}`);
         if (serverInfo) {
           addLine("output", `  Version: ${serverInfo.version}`);
@@ -90,7 +91,7 @@ export function Terminal({ className }: TerminalProps) {
 
       case "nodes": {
         if (graphData.nodes.length === 0) {
-          addLine("error", "No nodes loaded. Is Cortex running?");
+          addLine("error", "No nodes loaded. Is the server running?");
           break;
         }
         addLine("output", "Node types:");
@@ -182,7 +183,7 @@ export function Terminal({ className }: TerminalProps) {
       }
 
       case "reconnect":
-        addLine("output", "Reconnecting to Cortex...");
+        addLine("output", "Reconnecting...");
         connect().then(() => {
           const s = useGraphStore.getState();
           if (s.status === "connected") {

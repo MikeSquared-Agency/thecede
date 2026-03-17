@@ -28,7 +28,7 @@ export function GraphView() {
         <div className="flex flex-col items-center gap-4">
           <div className="size-10 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
           <span className="font-mono text-[11px] text-muted-foreground/60">
-            Connecting to Cortex…
+            Connecting…
           </span>
         </div>
       </div>
@@ -44,7 +44,7 @@ export function GraphView() {
           </div>
           <div className="flex flex-col gap-1.5">
             <span className="font-mono text-[13px] font-medium text-foreground/80">
-              No Cortex connection
+              No connection
             </span>
             <span className="font-mono text-[10px] text-muted-foreground/60 leading-relaxed">
               Start the server with{" "}
@@ -73,7 +73,7 @@ export function GraphView() {
               Graph is empty
             </span>
             <span className="font-mono text-[10px] text-muted-foreground/50 leading-relaxed">
-              Connected to Cortex, but no nodes yet. Create nodes via the API, CLI, or an agent.
+              Connected, but no nodes yet. Create nodes via the API, CLI, or an agent.
             </span>
           </div>
         </div>

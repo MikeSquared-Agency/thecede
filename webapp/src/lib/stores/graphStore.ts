@@ -85,7 +85,7 @@ export const useGraphStore = create<GraphState & GraphActions>()((set, get) => (
     } catch (err) {
       set({
         status: "error",
-        error: err instanceof Error ? err.message : "Failed to connect to Cortex",
+        error: err instanceof Error ? err.message : "Failed to connect",
       });
     }
   },
