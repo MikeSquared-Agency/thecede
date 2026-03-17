@@ -1,4 +1,11 @@
-export type NodeKind = "Rule" | "Fact" | "Document" | "Task" | "Pattern" | "Domain" | "Tool";
+/**
+ * Cortex graph types — generic, not agent-specific.
+ *
+ * NodeKind is a string (Cortex uses validated string newtypes, not enums).
+ * The "well-known" kinds get colors; unknown kinds get a grey default.
+ */
+
+export type NodeKind = string;
 
 export interface CortexNode {
   id: string;
@@ -8,6 +15,9 @@ export interface CortexNode {
   importance: number;
   edges: number;
   body?: string;
+  agent?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface CortexEdge {
@@ -22,22 +32,53 @@ export interface CortexData {
   edges: CortexEdge[];
 }
 
-export const KIND_COLORS: Record<NodeKind, string> = {
-  Rule: "#f97316",
-  Fact: "#eab308",
-  Document: "#06b6d4",
-  Task: "#f43f5e",
-  Pattern: "#a78bfa",
-  Domain: "#3b82f6",
-  Tool: "#10b981",
+/** Well-known kind colors. Unknown kinds fall back to grey. */
+const WELL_KNOWN_COLORS: Record<string, string> = {
+  rule: "#f97316",
+  fact: "#eab308",
+  document: "#06b6d4",
+  task: "#f43f5e",
+  pattern: "#a78bfa",
+  domain: "#3b82f6",
+  tool: "#10b981",
+  entity: "#ec4899",
+  decision: "#8b5cf6",
+  observation: "#14b8a6",
+  goal: "#f59e0b",
+  memory: "#6366f1",
+  skill: "#22d3ee",
 };
 
-export const KIND_LABELS: Record<NodeKind, string> = {
-  Rule: "Behavioral rules & constraints",
-  Fact: "Stored facts",
-  Document: "Knowledge documents",
-  Task: "Active tasks",
-  Pattern: "Recognized patterns",
-  Domain: "Domain categories",
-  Tool: "Available tools & integrations",
+const DEFAULT_COLOR = "#6b7280";
+
+/** Get color for any node kind. Case-insensitive. */
+export function getKindColor(kind: string): string {
+  return WELL_KNOWN_COLORS[kind.toLowerCase()] ?? DEFAULT_COLOR;
+}
+
+/** Description labels for well-known kinds. */
+export const KIND_LABELS: Record<string, string> = {
+  rule: "Behavioral rules & constraints",
+  fact: "Stored facts & observations",
+  document: "Knowledge documents & notes",
+  task: "Active tasks & work items",
+  pattern: "Recognized patterns",
+  domain: "Domain categories",
+  tool: "Available tools & integrations",
+  entity: "Resolved entities",
+  decision: "Decisions & rationale",
+  observation: "Agent observations",
+  goal: "Goals & objectives",
+  memory: "Episodic memories",
+  skill: "Learned skills",
 };
+
+// Backwards compat — use getKindColor() for new code
+export const KIND_COLORS: Record<string, string> = new Proxy(
+  {} as Record<string, string>,
+  {
+    get(_target, prop: string) {
+      return getKindColor(prop);
+    },
+  }
+);

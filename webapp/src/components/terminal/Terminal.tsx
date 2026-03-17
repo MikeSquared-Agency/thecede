@@ -5,18 +5,13 @@ import { cn } from "@/lib/utils";
 import { Terminal as TerminalIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGraphStore } from "@/lib/stores/graphStore";
-import { CORTEX_DATA } from "@/lib/data/cortex-data";
-import { searchNodes } from "@/lib/graph-utils";
-import type { NodeKind } from "@/lib/types/cortex";
 
-const ASCII_BANNER = `██╗     ██╗██╗     ██╗   ██╗
-██║     ██║██║     ╚██╗ ██╔╝
-██║     ██║██║      ╚████╔╝
-██║     ██║██║       ╚██╔╝
-███████╗██║███████╗   ██║
-╚══════╝╚═╝╚══════╝   ╚═╝   `;
-
-const VALID_KINDS: NodeKind[] = ["Rule", "Fact", "Document", "Task", "Pattern", "Domain", "Tool"];
+const ASCII_BANNER = ` ██████╗ ██████╗ ██████╗ ████████╗███████╗██╗  ██╗
+██╔════╝██╔═══██╗██╔══██╗╚══██╔══╝██╔════╝╚██╗██╔╝
+██║     ██║   ██║██████╔╝   ██║   █████╗   ╚███╔╝
+██║     ██║   ██║██╔══██╗   ██║   ██╔══╝   ██╔██╗
+╚██████╗╚██████╔╝██║  ██║   ██║   ███████╗██╔╝ ██╗
+ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝`;
 
 interface TerminalLine {
   id: number;
@@ -32,7 +27,7 @@ interface TerminalProps {
 export function Terminal({ className }: TerminalProps) {
   const [lines, setLines] = useState<TerminalLine[]>([
     { id: 0, type: "ascii", content: ASCII_BANNER, timestamp: new Date() },
-    { id: 1, type: "system", content: "Lily Cortex Graph Explorer v0.1.0", timestamp: new Date() },
+    { id: 1, type: "system", content: "Cortex Graph Explorer v0.2.0", timestamp: new Date() },
     { id: 2, type: "output", content: "Type 'help' for commands.", timestamp: new Date() },
   ]);
   const [input, setInput] = useState("");
@@ -42,7 +37,7 @@ export function Terminal({ className }: TerminalProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const idCounter = useRef(3);
 
-  const { setFilter, setSearchQuery, setSearchResults, selectNode } = useGraphStore();
+  const { setFilter, selectNode, graphData, kinds, status, serverInfo, connect, search: storeSearch } = useGraphStore();
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -69,13 +64,13 @@ export function Terminal({ className }: TerminalProps) {
         addLine("output", "Available commands:");
         addLine("output", "  help      - Show this message");
         addLine("output", "  clear     - Clear terminal");
-        addLine("output", "  status    - Show graph status");
+        addLine("output", "  status    - Connection & server info");
         addLine("output", "  nodes     - List node types with counts");
         addLine("output", "  search    - Search nodes (updates graph)");
         addLine("output", "  filter    - Filter by node type");
         addLine("output", "  select    - Select node by partial title");
         addLine("output", "  stats     - Graph statistics");
-        addLine("output", "  suggest   - Send a suggestion to Lily");
+        addLine("output", "  reconnect - Reconnect to Cortex server");
         addLine("output", "  history   - Show command history");
         break;
 
@@ -85,34 +80,45 @@ export function Terminal({ className }: TerminalProps) {
 
       case "status":
         addLine("output", "Cortex Status:");
-        addLine("output", "  Graph: LOADED");
-        addLine("output", `  Nodes: ${CORTEX_DATA.nodes.length}`);
-        addLine("output", `  Edges: ${CORTEX_DATA.edges.length}`);
-        addLine("output", "  Source: cortex export");
+        addLine("output", `  Connection: ${status.toUpperCase()}`);
+        if (serverInfo) {
+          addLine("output", `  Version: ${serverInfo.version}`);
+          addLine("output", `  Uptime: ${Math.floor(serverInfo.uptime_seconds)}s`);
+        }
+        addLine("output", `  Nodes: ${graphData.nodes.length}`);
+        addLine("output", `  Edges: ${graphData.edges.length}`);
+        addLine("output", `  Kinds: ${kinds.length > 0 ? kinds.join(", ") : "(none)"}`);
         break;
 
       case "nodes": {
+        if (graphData.nodes.length === 0) {
+          addLine("error", "No nodes loaded. Is Cortex running?");
+          break;
+        }
         addLine("output", "Node types:");
         const counts: Record<string, number> = {};
-        CORTEX_DATA.nodes.forEach((n) => {
+        graphData.nodes.forEach((n) => {
           counts[n.kind] = (counts[n.kind] || 0) + 1;
         });
-        VALID_KINDS.forEach((kind) => {
+        kinds.forEach((kind) => {
           const count = counts[kind] || 0;
-          addLine("output", `  ${kind.padEnd(10)} ${String(count).padStart(3)}`);
+          addLine("output", `  ${kind.padEnd(14)} ${String(count).padStart(4)}`);
         });
         break;
       }
 
       case "stats": {
-        const totalNodes = CORTEX_DATA.nodes.length;
-        const totalEdges = CORTEX_DATA.edges.length;
-        const avgEdges = (totalEdges * 2 / totalNodes).toFixed(2);
+        const totalNodes = graphData.nodes.length;
+        const totalEdges = graphData.edges.length;
+        const avgEdges = totalNodes > 0 ? (totalEdges * 2 / totalNodes).toFixed(2) : "0";
         addLine("output", "Graph Statistics:");
         addLine("output", `  Total nodes: ${totalNodes}`);
         addLine("output", `  Total edges: ${totalEdges}`);
         addLine("output", `  Avg edges/node: ${avgEdges}`);
-        addLine("output", `  Node types: ${VALID_KINDS.length}`);
+        addLine("output", `  Node types: ${kinds.length}`);
+        if (serverInfo) {
+          addLine("output", `  Server: v${serverInfo.version} (${Math.floor(serverInfo.uptime_seconds)}s uptime)`);
+        }
         break;
       }
 
@@ -121,12 +127,16 @@ export function Terminal({ className }: TerminalProps) {
           addLine("error", "Usage: search <query>");
         } else {
           const query = args.slice(1).join(" ");
-          const results = searchNodes(CORTEX_DATA.nodes, query);
-          setSearchQuery(query);
-          setSearchResults(results);
-          addLine("output", `Found ${results.length} result${results.length !== 1 ? "s" : ""} for "${query}":`);
-          results.forEach((r) => {
-            addLine("output", `  [${r.kind}] ${r.title} (${r.importance.toFixed(2)})`);
+          addLine("output", `Searching for "${query}"...`);
+          storeSearch(query).then(() => {
+            const results = useGraphStore.getState().searchResults;
+            addLine("output", `Found ${results.length} result${results.length !== 1 ? "s" : ""}:`);
+            results.slice(0, 10).forEach((r) => {
+              addLine("output", `  [${r.kind}] ${r.title} (${r.importance.toFixed(2)})`);
+            });
+            if (results.length > 10) {
+              addLine("output", `  ... and ${results.length - 10} more`);
+            }
           });
         }
         break;
@@ -134,20 +144,21 @@ export function Terminal({ className }: TerminalProps) {
       case "filter": {
         if (args.length < 2) {
           addLine("error", "Usage: filter <type|all>");
-          addLine("output", `  Types: ${VALID_KINDS.join(", ").toLowerCase()}, all`);
+          addLine("output", `  Types: ${kinds.join(", ").toLowerCase()}, all`);
         } else {
           const filterArg = args[1];
           if (filterArg === "all") {
             setFilter("all");
             addLine("output", "Filter cleared — showing all nodes");
           } else {
-            const match = VALID_KINDS.find((k) => k.toLowerCase() === filterArg);
+            const match = kinds.find((k) => k.toLowerCase() === filterArg);
             if (match) {
               setFilter(match);
-              addLine("output", `Filtering graph to: ${match}`);
+              const count = graphData.nodes.filter((n) => n.kind === match).length;
+              addLine("output", `Filtering to: ${match} (${count} nodes)`);
             } else {
               addLine("error", `Unknown type: ${filterArg}`);
-              addLine("output", `  Valid types: ${VALID_KINDS.join(", ").toLowerCase()}, all`);
+              addLine("output", `  Valid types: ${kinds.join(", ").toLowerCase()}, all`);
             }
           }
         }
@@ -159,7 +170,7 @@ export function Terminal({ className }: TerminalProps) {
           addLine("error", "Usage: select <partial title>");
         } else {
           const partial = args.slice(1).join(" ");
-          const found = CORTEX_DATA.nodes.find((n) =>
+          const found = graphData.nodes.find((n) =>
             n.title.toLowerCase().includes(partial)
           );
           if (found) {
@@ -172,23 +183,17 @@ export function Terminal({ className }: TerminalProps) {
         break;
       }
 
-      case "suggest": {
-        if (args.length < 2) {
-          addLine("error", "Usage: suggest <message>");
-        } else {
-          const message = cmd.trim().slice(command.length).trim();
-          const suggestion = {
-            id: crypto.randomUUID(),
-            name: "",
-            message,
-            timestamp: new Date().toISOString(),
-          };
-          const existing = JSON.parse(localStorage.getItem("lily-suggestions") || "[]");
-          localStorage.setItem("lily-suggestions", JSON.stringify([suggestion, ...existing]));
-          addLine("output", "Got it. I'll read this in my next heartbeat cycle.");
-        }
+      case "reconnect":
+        addLine("output", "Reconnecting to Cortex...");
+        connect().then(() => {
+          const s = useGraphStore.getState();
+          if (s.status === "connected") {
+            addLine("output", `Connected! v${s.serverInfo?.version ?? "?"} — ${s.graphData.nodes.length} nodes loaded`);
+          } else {
+            addLine("error", `Connection failed: ${s.error ?? "unknown error"}`);
+          }
+        });
         break;
-      }
 
       case "history":
         if (history.length === 0) {
@@ -208,7 +213,7 @@ export function Terminal({ className }: TerminalProps) {
         addLine("error", `Unknown command: ${command}`);
         addLine("output", "Type 'help' for available commands");
     }
-  }, [addLine, history, setFilter, setSearchQuery, setSearchResults, selectNode]);
+  }, [addLine, history, setFilter, selectNode, graphData, kinds, status, serverInfo, connect, storeSearch]);
 
   const handleSubmit = useCallback((e: { preventDefault: () => void }) => {
     e.preventDefault();

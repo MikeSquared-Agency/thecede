@@ -15,8 +15,8 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lily · Cortex Graph Explorer",
-  description: "Interactive knowledge graph explorer for cortex memory",
+  title: "Cortex · Graph Explorer",
+  description: "Interactive knowledge graph explorer for Cortex memory engine",
 };
 
 export default function RootLayout({

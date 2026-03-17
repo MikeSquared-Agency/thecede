@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { CORTEX_DATA } from "@/lib/data/cortex-data";
-import { KIND_COLORS } from "@/lib/types/cortex";
+import { getKindColor } from "@/lib/types/cortex";
+import { useGraphStore } from "@/lib/stores/graphStore";
 import { truncateTitle } from "@/lib/graph-utils";
 
 interface ChatMessage {
@@ -17,15 +17,35 @@ export function LiveChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const idRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const graphNodes = useGraphStore((s) => s.graphData.nodes);
+  const lastEvent = useGraphStore((s) => s.lastEvent);
+
+  // Show live SSE events as chat messages
+  useEffect(() => {
+    if (!lastEvent) return;
+    const id = idRef.current++;
+    const eventData = lastEvent.data;
+    const msg: ChatMessage = {
+      id,
+      title: truncateTitle(String(eventData.title ?? eventData.id ?? lastEvent.event_type), 36),
+      kind: String(eventData.kind ?? lastEvent.event_type),
+      color: getKindColor(String(eventData.kind ?? "")),
+      exiting: false,
+    };
+    setMessages((prev) => [...prev.slice(-11), msg]);
+    setTimeout(() => setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, exiting: true } : m))), 7000);
+    setTimeout(() => setMessages((prev) => prev.filter((m) => m.id !== id)), 7600);
+  }, [lastEvent]);
 
   const postChat = useCallback(() => {
-    const node = CORTEX_DATA.nodes[Math.floor(Math.random() * CORTEX_DATA.nodes.length)];
+    if (graphNodes.length === 0) return;
+    const node = graphNodes[Math.floor(Math.random() * graphNodes.length)];
     const id = idRef.current++;
     const msg: ChatMessage = {
       id,
       title: truncateTitle(node.title, 36),
       kind: node.kind,
-      color: KIND_COLORS[node.kind],
+      color: getKindColor(node.kind),
       exiting: false,
     };
 

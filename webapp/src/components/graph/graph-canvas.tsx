@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useCallback, useState } from "react";
 import type { CortexNode, CortexEdge } from "@/lib/types/cortex";
-import { KIND_COLORS } from "@/lib/types/cortex";
+import { getKindColor } from "@/lib/types/cortex";
 import { getNodeRadius, truncateTitle } from "@/lib/graph-utils";
 import { useGraphStore } from "@/lib/stores/graphStore";
 import { GraphLegend } from "./graph-legend";
@@ -150,7 +150,7 @@ export function GraphCanvas({ nodes, edges }: GraphCanvasProps) {
         .join("line")
         .attr("stroke", (d) => {
           const sourceNode = simNodes.find((n) => n.id === (typeof d.source === "string" ? d.source : (d.source as SimNode).id));
-          return sourceNode ? KIND_COLORS[sourceNode.kind] : "#333";
+          return sourceNode ? getKindColor(sourceNode.kind) : "#333";
         })
         .attr("stroke-width", (d) => Math.max(0.2, d.weight * 1.2))
         .attr("stroke-opacity", (d) => Math.max(0.04, d.weight * 0.15));
@@ -162,9 +162,9 @@ export function GraphCanvas({ nodes, edges }: GraphCanvasProps) {
         .data(simNodes)
         .join("circle")
         .attr("r", (d) => getNodeRadius(d.importance))
-        .attr("fill", (d) => KIND_COLORS[d.kind])
+        .attr("fill", (d) => getKindColor(d.kind))
         .attr("fill-opacity", (d) => 0.6 + d.importance * 0.4)
-        .attr("stroke", (d) => KIND_COLORS[d.kind])
+        .attr("stroke", (d) => getKindColor(d.kind))
         .attr("stroke-width", (d) => (d.importance > 0.8 ? 1.5 : 0.5))
         .attr("stroke-opacity", (d) => (d.importance > 0.8 ? 0.6 : 0.2))
         .attr("filter", (d) => (d.importance > 0.85 ? "url(#node-glow)" : null))
@@ -179,7 +179,7 @@ export function GraphCanvas({ nodes, edges }: GraphCanvasProps) {
 
           tooltip.style.opacity = "1";
           tooltip.innerHTML = `
-            <div class="tt-kind" style="color:${KIND_COLORS[d.kind]}">${d.kind}</div>
+            <div class="tt-kind" style="color:${getKindColor(d.kind)}">${d.kind}</div>
             <div class="tt-title">${d.title}</div>
             <div class="tt-meta">${d.importance.toFixed(2)} imp · ${d.edges} edges</div>
           `;

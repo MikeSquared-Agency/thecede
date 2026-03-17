@@ -1,44 +1,36 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGraphStore } from "@/lib/stores/graphStore";
-import { CORTEX_DATA } from "@/lib/data/cortex-data";
-import { searchNodes } from "@/lib/graph-utils";
-import { KIND_COLORS } from "@/lib/types/cortex";
-import type { NodeKind } from "@/lib/types/cortex";
-
-const FILTER_OPTIONS: Array<NodeKind | "all"> = [
-  "all", "Rule", "Fact", "Document", "Task", "Pattern", "Domain", "Tool",
-];
+import { getKindColor } from "@/lib/types/cortex";
 
 export function GraphSidebar() {
   const {
     activeFilter, setFilter,
-    setSearchQuery, searchResults, setSearchResults,
+    searchResults, search,
     selectedNode, selectNode,
+    kinds, graphData,
   } = useGraphStore();
 
   const [localQuery, setLocalQuery] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Dynamic filter options: "all" + whatever kinds exist in loaded data
+  const filterOptions = useMemo(() => ["all", ...kinds], [kinds]);
 
   const handleSearch = useCallback(
     (value: string) => {
       setLocalQuery(value);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        setSearchQuery(value);
-        if (value.trim()) {
-          setSearchResults(searchNodes(CORTEX_DATA.nodes, value));
-        } else {
-          setSearchResults([]);
-        }
+        search(value);
       }, 250);
     },
-    [setSearchQuery, setSearchResults]
+    [search]
   );
 
   useEffect(() => {
@@ -53,7 +45,7 @@ export function GraphSidebar() {
           Filter
         </span>
         <div className="flex flex-wrap gap-[3px]">
-          {FILTER_OPTIONS.map((kind) => {
+          {filterOptions.map((kind) => {
             const isActive = activeFilter === kind;
             return (
               <button
@@ -70,7 +62,7 @@ export function GraphSidebar() {
                 {kind !== "all" && (
                   <span
                     className="size-[5px] rounded-full shrink-0"
-                    style={{ backgroundColor: KIND_COLORS[kind] }}
+                    style={{ backgroundColor: getKindColor(kind) }}
                   />
                 )}
                 {kind}
@@ -114,7 +106,7 @@ export function GraphSidebar() {
                 <div className="flex items-center gap-1 mb-0.5">
                   <span
                     className="size-[5px] rounded-full shrink-0"
-                    style={{ backgroundColor: KIND_COLORS[node.kind] }}
+                    style={{ backgroundColor: getKindColor(node.kind) }}
                   />
                   <span className="font-mono text-[9px] text-muted-foreground">
                     {node.kind}
@@ -147,11 +139,11 @@ export function GraphSidebar() {
             <div className="flex items-center gap-1.5 mb-0.5">
               <span
                 className="size-[7px] rounded-full shrink-0"
-                style={{ backgroundColor: KIND_COLORS[selectedNode.kind] }}
+                style={{ backgroundColor: getKindColor(selectedNode.kind) }}
               />
               <span
                 className="font-mono text-[10px] font-medium"
-                style={{ color: KIND_COLORS[selectedNode.kind] }}
+                style={{ color: getKindColor(selectedNode.kind) }}
               >
                 {selectedNode.kind}
               </span>

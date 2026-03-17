@@ -1,24 +1,45 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { CORTEX_DATA } from "@/lib/data/cortex-data";
 import { useGraphStore } from "@/lib/stores/graphStore";
 
 const NAV_ITEMS = [
   { href: "/", label: "Graph" },
-  { href: "/how-it-works", label: "How It Works" },
+  { href: "/about", label: "About" },
 ] as const;
 
 export function CortexHeader() {
   const pathname = usePathname();
+  const status = useGraphStore((s) => s.status);
+  const graphData = useGraphStore((s) => s.graphData);
   const activeFilter = useGraphStore((s) => s.activeFilter);
+  const serverInfo = useGraphStore((s) => s.serverInfo);
+  const connect = useGraphStore((s) => s.connect);
+
+  // Auto-connect on mount
+  useEffect(() => {
+    if (status === "disconnected") {
+      connect();
+    }
+  }, [status, connect]);
 
   const visibleNodes =
     activeFilter === "all"
-      ? CORTEX_DATA.nodes.length
-      : CORTEX_DATA.nodes.filter((n) => n.kind === activeFilter).length;
+      ? graphData.nodes.length
+      : graphData.nodes.filter((n) => n.kind === activeFilter).length;
+
+  const statusColor =
+    status === "connected" ? "bg-emerald-500" :
+    status === "connecting" ? "bg-amber-500" :
+    status === "error" ? "bg-red-500" : "bg-zinc-500";
+
+  const statusLabel =
+    status === "connected" ? "live" :
+    status === "connecting" ? "connecting" :
+    status === "error" ? "offline" : "disconnected";
 
   return (
     <header className="flex items-center justify-between h-10 px-4 border-b border-border bg-card shrink-0">
@@ -27,11 +48,13 @@ export function CortexHeader() {
         <Link href="/" className="flex items-center gap-1.5 pr-4 mr-1 border-r border-border">
           <span className="text-sm">🧠</span>
           <span className="font-mono text-[11px] font-semibold text-primary tracking-tight">
-            lily
-          </span>
-          <span className="font-mono text-[11px] text-muted-foreground tracking-tight">
             cortex
           </span>
+          {serverInfo && (
+            <span className="font-mono text-[9px] text-muted-foreground/50 tracking-tight">
+              v{serverInfo.version}
+            </span>
+          )}
         </Link>
 
         <nav className="flex items-center">
@@ -57,28 +80,36 @@ export function CortexHeader() {
         </nav>
       </div>
 
-      {/* Right: stats + live */}
+      {/* Right: stats + status */}
       <div className="flex items-center gap-3">
         <div className="font-mono text-[10px] text-muted-foreground tabular-nums flex items-center gap-2">
           <span>
             <span className="text-foreground/70">{visibleNodes}</span>
-            <span className="text-muted-foreground/50"> / {CORTEX_DATA.nodes.length} nodes</span>
+            <span className="text-muted-foreground/50"> / {graphData.nodes.length} nodes</span>
           </span>
           <span className="text-border">·</span>
           <span>
-            <span className="text-foreground/70">{CORTEX_DATA.edges.length}</span>
+            <span className="text-foreground/70">{graphData.edges.length}</span>
             <span className="text-muted-foreground/50"> edges</span>
           </span>
         </div>
-        <div className="flex items-center gap-1">
+        <button
+          onClick={() => { if (status !== "connecting") connect(); }}
+          className="flex items-center gap-1 hover:opacity-80 transition-opacity"
+          title={status === "error" ? "Click to reconnect" : `Status: ${statusLabel}`}
+        >
           <span
-            className="size-[5px] rounded-full bg-emerald-500"
-            style={{ animation: "pulse-live 2s ease-in-out infinite" }}
+            className={cn("size-[5px] rounded-full", statusColor)}
+            style={status === "connected" ? { animation: "pulse-live 2s ease-in-out infinite" } : undefined}
           />
-          <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-emerald-500/80">
-            live
+          <span className={cn(
+            "font-mono text-[9px] uppercase tracking-[0.1em]",
+            status === "connected" ? "text-emerald-500/80" :
+            status === "error" ? "text-red-500/80" : "text-muted-foreground/60"
+          )}>
+            {statusLabel}
           </span>
-        </div>
+        </button>
       </div>
     </header>
   );
