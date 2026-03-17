@@ -4,23 +4,38 @@ import { useMemo } from "react";
 import { useGraphStore } from "@/lib/stores/graphStore";
 import { filterNodes, filterEdges } from "@/lib/graph-utils";
 import { GraphCanvas } from "./graph-canvas";
-import { GraphSidebar } from "./graph-sidebar";
-import { LiveChat } from "./live-chat";
+import { GraphSearch } from "./graph-search";
+import { NodeDetail } from "./node-detail";
+import { ActivityStream } from "./activity-stream";
 
 export function GraphView() {
   const activeFilter = useGraphStore((s) => s.activeFilter);
   const graphData = useGraphStore((s) => s.graphData);
+  const searchResults = useGraphStore((s) => s.searchResults);
+  const searchQuery = useGraphStore((s) => s.searchQuery);
+  const recentEdgeKeys = useGraphStore((s) => s.recentEdgeKeys);
+  const selectedNode = useGraphStore((s) => s.selectedNode);
   const status = useGraphStore((s) => s.status);
 
-  const filteredNodes = useMemo(
+  // Apply kind filter
+  const kindFiltered = useMemo(
     () => filterNodes(graphData.nodes, activeFilter),
     [graphData.nodes, activeFilter]
   );
 
-  const filteredEdges = useMemo(() => {
-    const nodeIds = new Set(filteredNodes.map((n) => n.id));
+  // When searching, show only matching nodes (intersected with kind filter)
+  const displayNodes = useMemo(() => {
+    if (searchResults.length > 0 && searchQuery.trim()) {
+      const kindFilteredIds = new Set(kindFiltered.map((n) => n.id));
+      return searchResults.filter((n) => kindFilteredIds.has(n.id));
+    }
+    return kindFiltered;
+  }, [kindFiltered, searchResults, searchQuery]);
+
+  const displayEdges = useMemo(() => {
+    const nodeIds = new Set(displayNodes.map((n) => n.id));
     return filterEdges(graphData.edges, nodeIds);
-  }, [filteredNodes, graphData.edges]);
+  }, [displayNodes, graphData.edges]);
 
   if (status === "connecting") {
     return (
@@ -59,6 +74,7 @@ export function GraphView() {
             Retry connection
           </button>
         </div>
+        <ActivityStream />
       </div>
     );
   }
@@ -77,17 +93,28 @@ export function GraphView() {
             </span>
           </div>
         </div>
+        <ActivityStream />
       </div>
     );
   }
 
   return (
-    <div className="flex size-full">
-      <GraphSidebar />
-      <div className="relative flex-1">
-        <GraphCanvas nodes={filteredNodes} edges={filteredEdges} />
-        <LiveChat />
-      </div>
+    <div className="relative size-full">
+      {/* Full-bleed graph canvas */}
+      <GraphCanvas
+        nodes={displayNodes}
+        edges={displayEdges}
+        recentEdgeKeys={recentEdgeKeys}
+      />
+
+      {/* Floating search + filter — top left */}
+      <GraphSearch />
+
+      {/* Node detail — bottom left */}
+      {selectedNode && <NodeDetail />}
+
+      {/* Twitch-style activity stream — right */}
+      <ActivityStream />
     </div>
   );
 }

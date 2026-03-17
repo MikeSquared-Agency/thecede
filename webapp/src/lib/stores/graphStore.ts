@@ -5,6 +5,26 @@ import type { CortexHealth, CortexSSEEvent } from "@/lib/cortex-client";
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
+export interface ActivityEvent {
+  id: number;
+  type: string;
+  label: string;
+  kind?: string;
+  color: string;
+  timestamp: Date;
+}
+
+const EVENT_COLORS: Record<string, string> = {
+  "node.created": "#10b981",
+  "node.updated": "#3b82f6",
+  "node.deleted": "#ef4444",
+  "edge.created": "#a78bfa",
+  "edge.updated": "#8b5cf6",
+  "edge.deleted": "#f97316",
+};
+
+let activityIdCounter = 0;
+
 interface GraphState {
   // Connection
   status: ConnectionStatus;
@@ -22,6 +42,8 @@ interface GraphState {
   selectedNode: CortexNode | null;
   zoomLevel: number;
   lastEvent: CortexSSEEvent | null;
+  activityLog: ActivityEvent[];
+  recentEdgeKeys: string[];
 }
 
 interface GraphActions {
@@ -32,6 +54,7 @@ interface GraphActions {
   // Data
   loadGraph: () => Promise<void>;
   search: (query: string) => Promise<void>;
+  clearSearch: () => void;
 
   // UI
   setFilter: (filter: string | "all") => void;
@@ -54,6 +77,8 @@ const initialState: GraphState = {
   selectedNode: null,
   zoomLevel: 1,
   lastEvent: null,
+  activityLog: [],
+  recentEdgeKeys: [],
 };
 
 let sseCleanup: (() => void) | null = null;
@@ -74,11 +99,48 @@ export const useGraphStore = create<GraphState & GraphActions>()((set, get) => (
       sseCleanup?.();
       sseCleanup = subscribeEvents((event) => {
         set({ lastEvent: event });
+
+        // Build activity log entry
+        const evtType = event.event_type ?? "unknown";
+        const data = event.data ?? {};
+        let label = String(data.title ?? data.name ?? "");
+        const kind = String(data.kind ?? "");
+
+        if (evtType.startsWith("edge.")) {
+          const srcId = String(data.source ?? data.from ?? "");
+          const tgtId = String(data.target ?? data.to ?? "");
+          const gd = get().graphData;
+          const srcNode = gd.nodes.find((n) => n.id === srcId);
+          const tgtNode = gd.nodes.find((n) => n.id === tgtId);
+          const srcName = srcNode?.title?.slice(0, 20) ?? srcId.slice(0, 8);
+          const tgtName = tgtNode?.title?.slice(0, 20) ?? tgtId.slice(0, 8);
+          label = `${srcName} \u2192 ${tgtName}`;
+        }
+
+        if (!label) label = String(data.id ?? evtType);
+
+        set((s) => ({
+          activityLog: [...s.activityLog.slice(-99), {
+            id: ++activityIdCounter,
+            type: evtType,
+            label,
+            kind: kind || undefined,
+            color: EVENT_COLORS[evtType] ?? "#6b7280",
+            timestamp: new Date(),
+          }],
+        }));
+
+        // Track recent edges for auto-link animation
+        if (evtType === "edge.created") {
+          const edgeKey = `${data.source ?? data.from}:${data.target ?? data.to}`;
+          set((s) => ({ recentEdgeKeys: [...s.recentEdgeKeys, edgeKey] }));
+          setTimeout(() => {
+            set((s) => ({ recentEdgeKeys: s.recentEdgeKeys.filter((k) => k !== edgeKey) }));
+          }, 3000);
+        }
+
         // Auto-reload on graph mutations
-        if (
-          event.event_type?.startsWith("node.") ||
-          event.event_type?.startsWith("edge.")
-        ) {
+        if (evtType.startsWith("node.") || evtType.startsWith("edge.")) {
           get().loadGraph();
         }
       });
@@ -133,6 +195,7 @@ export const useGraphStore = create<GraphState & GraphActions>()((set, get) => (
     }
   },
 
+  clearSearch: () => set({ searchQuery: "", searchResults: [] }),
   setFilter: (filter) => set(() => ({ activeFilter: filter })),
   setSearchQuery: (query) => set(() => ({ searchQuery: query })),
   setSearchResults: (results) => set(() => ({ searchResults: results })),

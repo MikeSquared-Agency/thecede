@@ -6,11 +6,9 @@ import { Terminal as TerminalIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGraphStore } from "@/lib/stores/graphStore";
 
-const ASCII_BANNER = ` _   _                        _
-| |_| |__   ___  ___ ___  __| | ___
-| __| '_ \\ / _ \\/ __/ _ \\/ _\` |/ _ \\
-| |_| | | |  __/ (_|  __/ (_| |  __/
- \\__|_| |_|\\___|\\___|\\___|\\_\\_,_|\\___|`;
+const ASCII_BANNER = `___ _  _ ____ ____ ____ ___  ____
+ |  |__| |___ |    |___ |  \\ |___
+ |  |  | |___ |___ |___ |__/ |___`;
 
 interface TerminalLine {
   id: number;
@@ -273,7 +271,7 @@ export function Terminal({ className }: TerminalProps) {
             line.type === "ascii" ? (
               <pre
                 key={line.id}
-                className="text-[7px] leading-[8px] text-primary/40 font-mono overflow-hidden select-none whitespace-pre"
+                className="text-[10px] leading-[13px] text-primary/50 font-mono overflow-hidden select-none whitespace-pre"
               >
                 {line.content}
               </pre>

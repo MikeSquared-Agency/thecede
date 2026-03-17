@@ -5,7 +5,6 @@ import type { CortexNode, CortexEdge } from "@/lib/types/cortex";
 import { getKindColor } from "@/lib/types/cortex";
 import { getNodeRadius, truncateTitle } from "@/lib/graph-utils";
 import { useGraphStore } from "@/lib/stores/graphStore";
-import { GraphLegend } from "./graph-legend";
 import { GraphControls } from "./graph-controls";
 
 interface SimNode extends CortexNode {
@@ -30,15 +29,18 @@ interface SimEdge {
 interface GraphCanvasProps {
   nodes: CortexNode[];
   edges: CortexEdge[];
+  recentEdgeKeys?: string[];
 }
 
-export function GraphCanvas({ nodes, edges }: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, recentEdgeKeys = [] }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const wobbleRef = useRef<number | null>(null);
   const zoomRef = useRef<ReturnType<typeof import("d3").zoom> | null>(null);
   const gRef = useRef<SVGGElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const recentEdgeKeysRef = useRef(recentEdgeKeys);
+  recentEdgeKeysRef.current = recentEdgeKeys;
   const selectNode = useGraphStore((s) => s.selectNode);
   const selectedNode = useGraphStore((s) => s.selectedNode);
   const [d3Loaded, setD3Loaded] = useState(false);
@@ -154,6 +156,28 @@ export function GraphCanvas({ nodes, edges }: GraphCanvasProps) {
         })
         .attr("stroke-width", (d) => Math.max(0.2, d.weight * 1.2))
         .attr("stroke-opacity", (d) => Math.max(0.04, d.weight * 0.15));
+
+      // Auto-link animation: pulse recently created edges
+      const recent = recentEdgeKeysRef.current;
+      if (recent.length > 0) {
+        linkGroup
+          .filter((d) => {
+            const s = typeof d.source === "string" ? d.source : (d.source as SimNode).id;
+            const t = typeof d.target === "string" ? d.target : (d.target as SimNode).id;
+            return recent.includes(`${s}:${t}`) || recent.includes(`${t}:${s}`);
+          })
+          .attr("stroke", "#a78bfa")
+          .attr("stroke-width", 2.5)
+          .attr("stroke-opacity", 0)
+          .transition()
+          .duration(400)
+          .attr("stroke-opacity", 0.9)
+          .transition()
+          .delay(1200)
+          .duration(1500)
+          .attr("stroke-width", (d) => Math.max(0.2, (d as SimEdge).weight * 1.2))
+          .attr("stroke-opacity", (d) => Math.max(0.04, (d as SimEdge).weight * 0.15));
+      }
 
       // Node circles
       const nodeGroup = g
@@ -320,7 +344,6 @@ export function GraphCanvas({ nodes, edges }: GraphCanvasProps) {
         `}</style>
       </div>
 
-      {d3Loaded && <GraphLegend />}
       {d3Loaded && (
         <GraphControls
           onFitView={handleFitView}
