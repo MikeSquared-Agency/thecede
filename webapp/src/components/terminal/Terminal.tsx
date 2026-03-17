@@ -6,12 +6,10 @@ import { Terminal as TerminalIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGraphStore } from "@/lib/stores/graphStore";
 
-const ASCII_BANNER = ` ██████╗ ██████╗ ██████╗ ████████╗███████╗██╗  ██╗
-██╔════╝██╔═══██╗██╔══██╗╚══██╔══╝██╔════╝╚██╗██╔╝
-██║     ██║   ██║██████╔╝   ██║   █████╗   ╚███╔╝
-██║     ██║   ██║██╔══██╗   ██║   ██╔══╝   ██╔██╗
-╚██████╗╚██████╔╝██║  ██║   ██║   ███████╗██╔╝ ██╗
- ╚═════╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝`;
+const ASCII_BANNER = `  ___  __  __  ____  ____  _  _
+ / __)/  \(  )(  _ \(_  _)( \/ )
+( (__(  O ))(  )   /  )(   )  /
+ \___)\_\/(__)(_)\_) (__) (_/\_)  `;
 
 interface TerminalLine {
   id: number;
@@ -264,7 +262,7 @@ export function Terminal({ className }: TerminalProps) {
         <span className="text-[9px] font-mono uppercase tracking-[0.1em] text-muted-foreground/60">
           Terminal
         </span>
-        <span className="ml-auto text-[8px] font-mono text-muted-foreground/30">v0.1.0</span>
+        <span className="ml-auto text-[8px] font-mono text-muted-foreground/30">v0.2.0</span>
       </div>
 
       {/* Output */}
@@ -274,7 +272,7 @@ export function Terminal({ className }: TerminalProps) {
             line.type === "ascii" ? (
               <pre
                 key={line.id}
-                className="text-[4px] leading-[4.5px] text-primary/50 font-mono overflow-hidden select-none"
+                className="text-[7px] leading-[8px] text-primary/40 font-mono overflow-hidden select-none whitespace-pre"
               >
                 {line.content}
               </pre>

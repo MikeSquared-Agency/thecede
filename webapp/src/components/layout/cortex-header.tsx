@@ -82,17 +82,19 @@ export function CortexHeader() {
 
       {/* Right: stats + status */}
       <div className="flex items-center gap-3">
-        <div className="font-mono text-[10px] text-muted-foreground tabular-nums flex items-center gap-2">
-          <span>
-            <span className="text-foreground/70">{visibleNodes}</span>
-            <span className="text-muted-foreground/50"> / {graphData.nodes.length} nodes</span>
-          </span>
-          <span className="text-border">·</span>
-          <span>
-            <span className="text-foreground/70">{graphData.edges.length}</span>
-            <span className="text-muted-foreground/50"> edges</span>
-          </span>
-        </div>
+        {graphData.nodes.length > 0 && (
+          <div className="font-mono text-[10px] text-muted-foreground tabular-nums flex items-center gap-2">
+            <span>
+              <span className="text-foreground/70">{visibleNodes}</span>
+              <span className="text-muted-foreground/50"> / {graphData.nodes.length} nodes</span>
+            </span>
+            <span className="text-border">·</span>
+            <span>
+              <span className="text-foreground/70">{graphData.edges.length}</span>
+              <span className="text-muted-foreground/50"> edges</span>
+            </span>
+          </div>
+        )}
         <button
           onClick={() => { if (status !== "connecting") connect(); }}
           className="flex items-center gap-1 hover:opacity-80 transition-opacity"

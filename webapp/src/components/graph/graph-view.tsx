@@ -24,11 +24,11 @@ export function GraphView() {
 
   if (status === "connecting") {
     return (
-      <div className="flex size-full items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <span className="text-sm">🧠</span>
-          <span className="font-mono text-[11px] text-muted-foreground animate-pulse">
-            Connecting to Cortex...
+      <div className="flex size-full items-center justify-center graph-bg">
+        <div className="flex flex-col items-center gap-4">
+          <div className="size-10 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+          <span className="font-mono text-[11px] text-muted-foreground/60">
+            Connecting to Cortex…
           </span>
         </div>
       </div>
@@ -37,21 +37,45 @@ export function GraphView() {
 
   if (status === "error") {
     return (
-      <div className="flex size-full items-center justify-center">
-        <div className="flex flex-col items-center gap-3 max-w-md text-center">
-          <span className="text-2xl">⚠️</span>
-          <span className="font-mono text-[12px] text-foreground/80">
-            Could not connect to Cortex
-          </span>
-          <span className="font-mono text-[10px] text-muted-foreground">
-            Make sure <code className="text-primary">cortex serve</code> is running on port 9091
-          </span>
+      <div className="flex size-full items-center justify-center graph-bg">
+        <div className="flex flex-col items-center gap-5 max-w-sm text-center">
+          <div className="size-14 rounded-full border border-border bg-card/60 flex items-center justify-center backdrop-blur-sm">
+            <span className="font-mono text-[24px] text-muted-foreground/40">&#x2298;</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="font-mono text-[13px] font-medium text-foreground/80">
+              No Cortex connection
+            </span>
+            <span className="font-mono text-[10px] text-muted-foreground/60 leading-relaxed">
+              Start the server with{" "}
+              <code className="px-1.5 py-0.5 rounded bg-card border border-border text-primary/80">cortex serve</code>{" "}
+              then retry
+            </span>
+          </div>
           <button
             onClick={() => useGraphStore.getState().connect()}
-            className="mt-2 px-3 py-1.5 rounded border border-primary/30 font-mono text-[10px] text-primary hover:bg-primary/10 transition-colors"
+            className="px-4 py-2 rounded-md border border-primary/20 bg-primary/5 font-mono text-[10px] text-primary hover:bg-primary/10 hover:border-primary/40 transition-all duration-200"
           >
             Retry connection
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (graphData.nodes.length === 0 && status === "connected") {
+    return (
+      <div className="flex size-full items-center justify-center graph-bg">
+        <div className="flex flex-col items-center gap-4 max-w-sm text-center">
+          <span className="text-3xl opacity-30">🧠</span>
+          <div className="flex flex-col gap-1.5">
+            <span className="font-mono text-[13px] font-medium text-foreground/70">
+              Graph is empty
+            </span>
+            <span className="font-mono text-[10px] text-muted-foreground/50 leading-relaxed">
+              Connected to Cortex, but no nodes yet. Create nodes via the API, CLI, or an agent.
+            </span>
+          </div>
         </div>
       </div>
     );
