@@ -288,14 +288,34 @@ export function Terminal({ className }: TerminalProps) {
           const query = trimmed.slice(7);
           addLine("output", `Searching: "${query}"`);
           storeSearch(query).then(() => {
+            const gd = useGraphStore.getState().graphData;
             const results = useGraphStore.getState().searchResults;
             addLine("output", `${results.length} result${results.length !== 1 ? "s" : ""}:`);
             results.slice(0, 12).forEach((r, i) => {
+              addLine("output", ``);
               addLine("output", `  ${String(i + 1).padStart(2)}. [${r.kind}] ${r.title} (${r.importance.toFixed(2)})`);
               if (r.body) {
                 addLine("output", `      ${r.body.slice(0, 80)}${r.body.length > 80 ? "…" : ""}`);
               }
               if (r.tags.length > 0) addLine("output", `      #${r.tags.join(" #")}`);
+              // Show connections for this result
+              const nodeEdges = gd.edges.filter((e) => e.source === r.id || e.target === r.id);
+              if (nodeEdges.length > 0) {
+                const shown = nodeEdges.slice(0, 5);
+                shown.forEach((e) => {
+                  const isOutgoing = e.source === r.id;
+                  const otherId = isOutgoing ? e.target : e.source;
+                  const other = gd.nodes.find((n) => n.id === otherId);
+                  const otherName = other?.title ?? otherId.slice(0, 12);
+                  const otherKind = other?.kind ?? "?";
+                  if (isOutgoing) {
+                    addLine("output", `        ──[ ${e.relation} ]──▸ ${otherName} [${otherKind}]`);
+                  } else {
+                    addLine("output", `        ◂──[ ${e.relation} ]── ${otherName} [${otherKind}]`);
+                  }
+                });
+                if (nodeEdges.length > 5) addLine("output", `        ... +${nodeEdges.length - 5} more edges`);
+              }
             });
             if (results.length > 12) addLine("output", `  ... +${results.length - 12} more`);
           });
