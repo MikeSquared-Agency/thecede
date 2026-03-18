@@ -246,17 +246,37 @@ export function Terminal({ className }: TerminalProps) {
         if (!found) { addLine("error", `No node matching "${partial}"`); break; }
         const nodeEdges = graphData.edges.filter((e) => e.source === found.id || e.target === found.id);
         if (nodeEdges.length === 0) { addLine("output", `No edges for "${found.title}"`); break; }
-        addLine("output", `Edges for "${found.title}" (${nodeEdges.length}):`);
-        nodeEdges.slice(0, 20).forEach((e) => {
-          const otherId = e.source === found.id ? e.target : e.source;
-          const other = graphData.nodes.find((n) => n.id === otherId);
-          const dir = e.source === found.id ? "→" : "←";
-          addLine("output", `  ${dir} ${e.relation.padEnd(12)} ${other?.title ?? otherId.slice(0, 12)} (w:${e.weight.toFixed(2)})`);
-          if (other?.body) {
-            addLine("output", `    ${other.body.slice(0, 60)}${other.body.length > 60 ? "…" : ""}`);
-          }
-        });
-        if (nodeEdges.length > 20) addLine("output", `  ... and ${nodeEdges.length - 20} more`);
+        const outgoing = nodeEdges.filter((e) => e.source === found.id);
+        const incoming = nodeEdges.filter((e) => e.target === found.id);
+        addLine("output", `─── Edges for "${found.title}" ───`);
+        addLine("output", `  ${outgoing.length} outgoing · ${incoming.length} incoming · ${nodeEdges.length} total`);
+        if (outgoing.length > 0) {
+          addLine("output", ``);
+          addLine("output", `  Outgoing:`);
+          outgoing.slice(0, 15).forEach((e) => {
+            const target = graphData.nodes.find((n) => n.id === e.target);
+            addLine("output", `    ${found.title}`);
+            addLine("output", `      ──[ ${e.relation} (${e.weight.toFixed(2)}) ]──▸`);
+            addLine("output", `    ${target?.title ?? e.target.slice(0, 12)} [${target?.kind ?? "?"}]`);
+            if (target?.body) {
+              addLine("output", `      ${target.body.slice(0, 70)}${target.body.length > 70 ? "…" : ""}`);
+            }
+          });
+        }
+        if (incoming.length > 0) {
+          addLine("output", ``);
+          addLine("output", `  Incoming:`);
+          incoming.slice(0, 15).forEach((e) => {
+            const source = graphData.nodes.find((n) => n.id === e.source);
+            addLine("output", `    ${source?.title ?? e.source.slice(0, 12)} [${source?.kind ?? "?"}]`);
+            addLine("output", `      ──[ ${e.relation} (${e.weight.toFixed(2)}) ]──▸`);
+            addLine("output", `    ${found.title}`);
+            if (source?.body) {
+              addLine("output", `      ${source.body.slice(0, 70)}${source.body.length > 70 ? "…" : ""}`);
+            }
+          });
+        }
+        if (nodeEdges.length > 30) addLine("output", `  ... and ${nodeEdges.length - 30} more`);
         selectNode(found);
         break;
       }

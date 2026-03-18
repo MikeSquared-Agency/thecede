@@ -109,12 +109,15 @@ export const useGraphStore = create<GraphState & GraphActions>()((set, get) => (
         if (evtType.startsWith("edge.")) {
           const srcId = String(data.source ?? data.from ?? "");
           const tgtId = String(data.target ?? data.to ?? "");
+          const relation = String(data.relation ?? data.type ?? "");
           const gd = get().graphData;
           const srcNode = gd.nodes.find((n) => n.id === srcId);
           const tgtNode = gd.nodes.find((n) => n.id === tgtId);
           const srcName = srcNode?.title?.slice(0, 20) ?? srcId.slice(0, 8);
           const tgtName = tgtNode?.title?.slice(0, 20) ?? tgtId.slice(0, 8);
-          label = `${srcName} \u2192 ${tgtName}`;
+          label = relation
+            ? `${srcName} \u2500[ ${relation} ]\u2500\u25B8 ${tgtName}`
+            : `${srcName} \u2192 ${tgtName}`;
         }
 
         if (!label) label = String(data.id ?? evtType);
