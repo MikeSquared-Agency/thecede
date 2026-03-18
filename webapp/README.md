@@ -1,36 +1,132 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-
-## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+  |    |                            |
+  __|  __ \    _ \   __|   _ \   _` |   _ \
+  |   | | |   __/  (     __/  (   |   __/
+ \__|_| |_| \___| \___| \___| \__,_| \___|
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+# thecede
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Real-time graph explorer for [Cortex](https://github.com/YOUR_ORG/cortex) — the embedded graph memory engine for AI agents.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Watch your agent's knowledge graph grow live: nodes appear, edges auto-link, trust scores shift — all streamed over SSE straight from Cortex.
 
-## Learn More
+## Features
 
-To learn more about Next.js, take a look at the following resources:
+- **Live graph canvas** — D3 force-directed layout with real-time node/edge animation
+- **Activity stream** — SSE-powered feed of every mutation as it happens
+- **Built-in terminal** — query nodes, search, inspect edges without leaving the browser
+- **Graph search** — vector + keyword hybrid search with kind filters
+- **Node detail panel** — full metadata, body, tags, trust score, connected edges
+- **WebMCP support** — exposes Cortex tools to in-browser agents via `navigator.modelContext`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Quick start
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Prerequisites
 
-## Deploy on Vercel
+- **Node.js ≥ 18.17** (check with `node -v`)
+- **A running Cortex server** — [install guide](https://github.com/YOUR_ORG/cortex#run)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 1. Clone & install
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+git clone https://github.com/YOUR_ORG/thecede.git
+cd thecede
+npm install
+```
+
+### 2. Configure
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local`:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_CORTEX_URL` | `http://localhost:9091` | URL the **browser** uses to reach Cortex (SSE + direct calls) |
+| `CORTEX_BACKEND_URL` | _(falls back to above)_ | URL the **Next.js server** uses to proxy REST calls (useful inside Docker) |
+
+### 3. Run
+
+```bash
+npm run dev          # development (http://localhost:3000)
+npm run build        # production build
+npm start            # serve production build
+```
+
+## Docker
+
+```bash
+# Build
+docker build -t thecede \
+  --build-arg NEXT_PUBLIC_CORTEX_URL=http://YOUR_CORTEX_HOST:9091 .
+
+# Run
+docker run -p 3000:3000 \
+  -e CORTEX_BACKEND_URL=http://cortex:9091 \
+  thecede
+```
+
+Or with `docker compose` alongside Cortex:
+
+```yaml
+services:
+  cortex:
+    image: ghcr.io/YOUR_ORG/cortex:latest
+    ports: ["9091:9091"]
+
+  thecede:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_CORTEX_URL: http://localhost:9091
+    ports: ["3000:3000"]
+    environment:
+      CORTEX_BACKEND_URL: http://cortex:9091
+    depends_on: [cortex]
+```
+
+## For agents
+
+Point your agent at the Cortex server directly (not thecede). thecede is a **read-only observer** — it watches the same graph your agent writes to.
+
+**Setup for your agent:**
+
+1. Start Cortex: `cortex serve`
+2. Start thecede: `npm start` (or Docker)
+3. Give your agent the Cortex URL (`http://localhost:9091`)
+4. Open thecede in your browser (`http://localhost:3000`) and watch
+
+The graph updates in real-time via SSE — no polling, no refresh needed.
+
+### WebMCP (experimental)
+
+If the browser supports `navigator.modelContext` (Chrome with the WebMCP flag), thecede registers Cortex tools so in-browser agents can read/write the graph directly through the UI.
+
+## Architecture
+
+```
+┌─────────────┐     SSE stream      ┌──────────────┐
+│   Browser    │◄───────────────────►│    Cortex    │
+│  (thecede)   │    REST (proxy)     │   :9091      │
+│   :3000      ├────────────────────►│              │
+└─────────────┘                      └──────────────┘
+       │                                    ▲
+       │  Next.js API route                 │
+       │  /api/cortex/*  ──────────────────►│
+       │  (server-side proxy)
+```
+
+- **SSE** connects directly from browser → Cortex (requires CORS)
+- **REST** goes through the Next.js API proxy to avoid mixed-content issues
+- Cortex must have CORS enabled for the browser's origin
+
+## Tech stack
+
+Next.js 16 · React 19 · TypeScript · D3.js · Zustand · Tailwind CSS 4 · shadcn/ui
+
+## License
+
+MIT

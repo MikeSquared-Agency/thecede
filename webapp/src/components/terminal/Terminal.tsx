@@ -5,14 +5,18 @@ import { cn } from "@/lib/utils";
 import { Terminal as TerminalIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGraphStore } from "@/lib/stores/graphStore";
+import type { ActivityEvent } from "@/lib/stores/graphStore";
 
-const ASCII_BANNER = `___ _  _ ____ ____ ____ ___  ____
- |  |__| |___ |    |___ |  \\ |___
- |  |  | |___ |___ |___ |__/ |___`;
+const ASCII_BANNER = [
+  "  |    |                            |       ",
+  "  __|  __ \\    _ \\   __|   _ \\   _` |   _ \\ ",
+  "  |    | | |   __/  (      __/  (   |   __/ ",
+  " \\__| _| |_| \\___| \\___| \\___| \\__,_| \\___| ",
+].join("\n");
 
 interface TerminalLine {
   id: number;
-  type: "input" | "output" | "error" | "system" | "ascii";
+  type: "input" | "output" | "error" | "system" | "ascii" | "event";
   content: string;
   timestamp: Date;
 }
@@ -21,20 +25,30 @@ interface TerminalProps {
   className?: string;
 }
 
+const EVENT_SYMBOLS: Record<string, string> = {
+  "node.created": "+",
+  "node.updated": "~",
+  "node.deleted": "×",
+  "edge.created": "⟷",
+  "edge.updated": "⟷",
+  "edge.deleted": "⊘",
+};
+
 export function Terminal({ className }: TerminalProps) {
   const [lines, setLines] = useState<TerminalLine[]>([
     { id: 0, type: "ascii", content: ASCII_BANNER, timestamp: new Date() },
-    { id: 1, type: "system", content: "thecede v0.2.0", timestamp: new Date() },
-    { id: 2, type: "output", content: "Type 'help' for commands.", timestamp: new Date() },
+    { id: 1, type: "system", content: "thecede v0.2.0 — type 'help' for commands", timestamp: new Date() },
   ]);
   const [input, setInput] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [liveEvents, setLiveEvents] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const idCounter = useRef(3);
+  const idCounter = useRef(2);
+  const prevActivityLenRef = useRef(0);
 
-  const { setFilter, selectNode, graphData, kinds, status, serverInfo, connect, search: storeSearch } = useGraphStore();
+  const { setFilter, selectNode, graphData, kinds, status, serverInfo, connect, search: storeSearch, activityLog } = useGraphStore();
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -51,71 +65,199 @@ export function Terminal({ className }: TerminalProps) {
     ]);
   }, []);
 
+  // Auto-print connection status when it changes
+  const prevStatusRef = useRef(status);
+  useEffect(() => {
+    if (prevStatusRef.current === status) return;
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = status;
+
+    if (status === "connected" && prev !== "connected") {
+      const s = useGraphStore.getState();
+      setLines((p) => [
+        ...p,
+        { id: idCounter.current++, type: "system", content: `Connected to Cortex v${s.serverInfo?.version ?? "?"}`, timestamp: new Date() },
+        { id: idCounter.current++, type: "output", content: `  ${s.graphData.nodes.length} nodes · ${s.graphData.edges.length} edges · ${s.kinds.length} types`, timestamp: new Date() },
+      ]);
+    } else if (status === "error") {
+      setLines((p) => [
+        ...p,
+        { id: idCounter.current++, type: "error", content: `Connection lost: ${useGraphStore.getState().error ?? "unknown"}`, timestamp: new Date() },
+      ]);
+    } else if (status === "connecting") {
+      setLines((p) => [
+        ...p,
+        { id: idCounter.current++, type: "system", content: "Connecting...", timestamp: new Date() },
+      ]);
+    }
+  }, [status]);
+
+  // Live-tail SSE events into terminal
+  useEffect(() => {
+    if (!liveEvents) return;
+    const log = activityLog;
+    if (log.length <= prevActivityLenRef.current) {
+      prevActivityLenRef.current = log.length;
+      return;
+    }
+    const newEvents = log.slice(prevActivityLenRef.current);
+    prevActivityLenRef.current = log.length;
+
+    const formatTime = (d: Date) =>
+      d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+
+    const newLines: TerminalLine[] = newEvents.map((evt: ActivityEvent) => {
+      const sym = EVENT_SYMBOLS[evt.type] ?? "•";
+      const shortType = evt.type.split(".").pop()?.toUpperCase() ?? "EVENT";
+      return {
+        id: idCounter.current++,
+        type: "event" as const,
+        content: `${formatTime(evt.timestamp)} ${sym} ${shortType.padEnd(8)} ${evt.label}`,
+        timestamp: evt.timestamp,
+      };
+    });
+
+    setLines((prev) => [...prev, ...newLines]);
+  }, [activityLog, liveEvents]);
+
   const handleCommand = useCallback((cmd: string) => {
-    const trimmed = cmd.trim().toLowerCase();
-    const args = trimmed.split(" ");
+    const trimmed = cmd.trim();
+    const lower = trimmed.toLowerCase();
+    const args = lower.split(" ");
     const command = args[0];
 
     switch (command) {
       case "help":
-        addLine("output", "Available commands:");
-        addLine("output", "  help      - Show this message");
-        addLine("output", "  clear     - Clear terminal");
-        addLine("output", "  status    - Connection & server info");
-        addLine("output", "  nodes     - List node types with counts");
-        addLine("output", "  search    - Search nodes (updates graph)");
-        addLine("output", "  filter    - Filter by node type");
-        addLine("output", "  select    - Select node by partial title");
-        addLine("output", "  stats     - Graph statistics");
-        addLine("output", "  reconnect - Reconnect to server");
-        addLine("output", "  history   - Show command history");
+        addLine("output", "Commands:");
+        addLine("output", "  status      Connection info & graph stats");
+        addLine("output", "  nodes       Node types with counts");
+        addLine("output", "  top [n]     Most important nodes (default: 10)");
+        addLine("output", "  recent [n]  Recently created nodes");
+        addLine("output", "  search <q>  Search nodes (updates graph view)");
+        addLine("output", "  inspect <t> Full details of a node by title");
+        addLine("output", "  edges <t>   Show edges for a node");
+        addLine("output", "  filter <k>  Filter graph by kind (or 'all')");
+        addLine("output", "  select <t>  Select node by partial title");
+        addLine("output", "  live        Toggle live event tail (currently: " + (liveEvents ? "ON" : "OFF") + ")");
+        addLine("output", "  reconnect   Reconnect to Cortex");
+        addLine("output", "  clear       Clear terminal");
         break;
 
       case "clear":
         setLines([]);
         break;
 
-      case "status":
-        addLine("output", "Status:");
-        addLine("output", `  Connection: ${status.toUpperCase()}`);
+      case "status": {
+        addLine("output", `Connection: ${status.toUpperCase()}`);
         if (serverInfo) {
-          addLine("output", `  Version: ${serverInfo.version}`);
-          addLine("output", `  Uptime: ${Math.floor(serverInfo.uptime_seconds)}s`);
+          const upMin = Math.floor(serverInfo.uptime_seconds / 60);
+          const upSec = Math.floor(serverInfo.uptime_seconds % 60);
+          addLine("output", `  Server v${serverInfo.version} — up ${upMin}m ${upSec}s`);
         }
-        addLine("output", `  Nodes: ${graphData.nodes.length}`);
-        addLine("output", `  Edges: ${graphData.edges.length}`);
-        addLine("output", `  Kinds: ${kinds.length > 0 ? kinds.join(", ") : "(none)"}`);
+        const totalNodes = graphData.nodes.length;
+        const totalEdges = graphData.edges.length;
+        const avgEdges = totalNodes > 0 ? (totalEdges * 2 / totalNodes).toFixed(1) : "0";
+        addLine("output", `  ${totalNodes} nodes · ${totalEdges} edges · avg ${avgEdges} edges/node`);
+        if (kinds.length > 0) {
+          const counts: Record<string, number> = {};
+          graphData.nodes.forEach((n) => { counts[n.kind] = (counts[n.kind] || 0) + 1; });
+          addLine("output", `  Kinds: ${kinds.map((k) => `${k}(${counts[k] ?? 0})`).join(" ")}`);
+        }
+        addLine("output", `  Live tail: ${liveEvents ? "ON" : "OFF"} · Events seen: ${activityLog.length}`);
         break;
+      }
 
       case "nodes": {
         if (graphData.nodes.length === 0) {
-          addLine("error", "No nodes loaded. Is the server running?");
+          addLine("error", "No nodes loaded");
           break;
         }
-        addLine("output", "Node types:");
         const counts: Record<string, number> = {};
-        graphData.nodes.forEach((n) => {
-          counts[n.kind] = (counts[n.kind] || 0) + 1;
-        });
+        graphData.nodes.forEach((n) => { counts[n.kind] = (counts[n.kind] || 0) + 1; });
+        addLine("output", "Kind           Count   Avg Imp");
         kinds.forEach((kind) => {
-          const count = counts[kind] || 0;
-          addLine("output", `  ${kind.padEnd(14)} ${String(count).padStart(4)}`);
+          const nodesOfKind = graphData.nodes.filter((n) => n.kind === kind);
+          const count = nodesOfKind.length;
+          const avgImp = count > 0 ? (nodesOfKind.reduce((s, n) => s + n.importance, 0) / count).toFixed(2) : "—";
+          addLine("output", `  ${kind.padEnd(14)} ${String(count).padStart(4)}    ${avgImp}`);
         });
         break;
       }
 
-      case "stats": {
-        const totalNodes = graphData.nodes.length;
-        const totalEdges = graphData.edges.length;
-        const avgEdges = totalNodes > 0 ? (totalEdges * 2 / totalNodes).toFixed(2) : "0";
-        addLine("output", "Graph Statistics:");
-        addLine("output", `  Total nodes: ${totalNodes}`);
-        addLine("output", `  Total edges: ${totalEdges}`);
-        addLine("output", `  Avg edges/node: ${avgEdges}`);
-        addLine("output", `  Node types: ${kinds.length}`);
-        if (serverInfo) {
-          addLine("output", `  Server: v${serverInfo.version} (${Math.floor(serverInfo.uptime_seconds)}s uptime)`);
+      case "top": {
+        const n = Math.min(parseInt(args[1]) || 10, 25);
+        const sorted = [...graphData.nodes].sort((a, b) => b.importance - a.importance).slice(0, n);
+        if (sorted.length === 0) { addLine("error", "No nodes"); break; }
+        addLine("output", `Top ${sorted.length} by importance:`);
+        sorted.forEach((node, i) => {
+          addLine("output", `  ${String(i + 1).padStart(2)}. ${node.importance.toFixed(2)} [${node.kind}] ${node.title}`);
+          if (node.body) {
+            addLine("output", `      ${node.body.slice(0, 80)}${node.body.length > 80 ? "…" : ""}`);
+          }
+          if (node.tags.length > 0) addLine("output", `      #${node.tags.join(" #")}`);
+        });
+        break;
+      }
+
+      case "recent": {
+        const n = Math.min(parseInt(args[1]) || 10, 25);
+        const sorted = [...graphData.nodes]
+          .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
+          .slice(0, n);
+        if (sorted.length === 0) { addLine("error", "No nodes"); break; }
+        addLine("output", `Last ${sorted.length} nodes:`);
+        sorted.forEach((node) => {
+          const ago = Math.floor((Date.now() - new Date(node.created_at ?? 0).getTime()) / 1000);
+          const agoStr = ago < 60 ? `${ago}s` : ago < 3600 ? `${Math.floor(ago / 60)}m` : `${Math.floor(ago / 3600)}h`;
+          addLine("output", `  ${agoStr.padStart(4)} ago  [${node.kind}] ${node.title}`);
+          if (node.body) {
+            addLine("output", `           ${node.body.slice(0, 80)}${node.body.length > 80 ? "…" : ""}`);
+          }
+        });
+        break;
+      }
+
+      case "inspect": {
+        if (args.length < 2) { addLine("error", "Usage: inspect <partial title>"); break; }
+        const partial = trimmed.slice(8).toLowerCase();
+        const found = graphData.nodes.find((n) => n.title.toLowerCase().includes(partial));
+        if (!found) { addLine("error", `No node matching "${partial}"`); break; }
+        addLine("output", `─── ${found.title} ───`);
+        addLine("output", `  Kind:       ${found.kind}`);
+        addLine("output", `  Importance: ${found.importance.toFixed(3)}`);
+        addLine("output", `  Edges:      ${found.edges}`);
+        if (found.tags.length > 0) addLine("output", `  Tags:       ${found.tags.join(", ")}`);
+        addLine("output", `  Created:    ${found.created_at ? new Date(found.created_at).toLocaleString() : "unknown"}`);
+        if (found.body) {
+          addLine("output", `  Body:`);
+          const bodyLines = found.body.match(/.{1,70}/g) ?? [found.body];
+          bodyLines.slice(0, 5).forEach((l) => addLine("output", `    ${l}`));
+          if (bodyLines.length > 5) addLine("output", `    ... (${bodyLines.length - 5} more lines)`);
         }
+        addLine("output", `  ID: ${found.id}`);
+        selectNode(found);
+        break;
+      }
+
+      case "edges": {
+        if (args.length < 2) { addLine("error", "Usage: edges <partial title>"); break; }
+        const partial = trimmed.slice(6).toLowerCase();
+        const found = graphData.nodes.find((n) => n.title.toLowerCase().includes(partial));
+        if (!found) { addLine("error", `No node matching "${partial}"`); break; }
+        const nodeEdges = graphData.edges.filter((e) => e.source === found.id || e.target === found.id);
+        if (nodeEdges.length === 0) { addLine("output", `No edges for "${found.title}"`); break; }
+        addLine("output", `Edges for "${found.title}" (${nodeEdges.length}):`);
+        nodeEdges.slice(0, 20).forEach((e) => {
+          const otherId = e.source === found.id ? e.target : e.source;
+          const other = graphData.nodes.find((n) => n.id === otherId);
+          const dir = e.source === found.id ? "→" : "←";
+          addLine("output", `  ${dir} ${e.relation.padEnd(12)} ${other?.title ?? otherId.slice(0, 12)} (w:${e.weight.toFixed(2)})`);
+          if (other?.body) {
+            addLine("output", `    ${other.body.slice(0, 60)}${other.body.length > 60 ? "…" : ""}`);
+          }
+        });
+        if (nodeEdges.length > 20) addLine("output", `  ... and ${nodeEdges.length - 20} more`);
+        selectNode(found);
         break;
       }
 
@@ -123,39 +265,40 @@ export function Terminal({ className }: TerminalProps) {
         if (args.length < 2) {
           addLine("error", "Usage: search <query>");
         } else {
-          const query = args.slice(1).join(" ");
-          addLine("output", `Searching for "${query}"...`);
+          const query = trimmed.slice(7);
+          addLine("output", `Searching: "${query}"`);
           storeSearch(query).then(() => {
             const results = useGraphStore.getState().searchResults;
-            addLine("output", `Found ${results.length} result${results.length !== 1 ? "s" : ""}:`);
-            results.slice(0, 10).forEach((r) => {
-              addLine("output", `  [${r.kind}] ${r.title} (${r.importance.toFixed(2)})`);
+            addLine("output", `${results.length} result${results.length !== 1 ? "s" : ""}:`);
+            results.slice(0, 12).forEach((r, i) => {
+              addLine("output", `  ${String(i + 1).padStart(2)}. [${r.kind}] ${r.title} (${r.importance.toFixed(2)})`);
+              if (r.body) {
+                addLine("output", `      ${r.body.slice(0, 80)}${r.body.length > 80 ? "…" : ""}`);
+              }
+              if (r.tags.length > 0) addLine("output", `      #${r.tags.join(" #")}`);
             });
-            if (results.length > 10) {
-              addLine("output", `  ... and ${results.length - 10} more`);
-            }
+            if (results.length > 12) addLine("output", `  ... +${results.length - 12} more`);
           });
         }
         break;
 
       case "filter": {
         if (args.length < 2) {
-          addLine("error", "Usage: filter <type|all>");
-          addLine("output", `  Types: ${kinds.join(", ").toLowerCase()}, all`);
+          addLine("output", `Current: ${useGraphStore.getState().activeFilter}`);
+          addLine("output", `Types: all ${kinds.join(" ")}`);
         } else {
           const filterArg = args[1];
           if (filterArg === "all") {
             setFilter("all");
-            addLine("output", "Filter cleared — showing all nodes");
+            addLine("output", "Showing all nodes");
           } else {
             const match = kinds.find((k) => k.toLowerCase() === filterArg);
             if (match) {
               setFilter(match);
               const count = graphData.nodes.filter((n) => n.kind === match).length;
-              addLine("output", `Filtering to: ${match} (${count} nodes)`);
+              addLine("output", `Filtered: ${match} (${count} nodes)`);
             } else {
-              addLine("error", `Unknown type: ${filterArg}`);
-              addLine("output", `  Valid types: ${kinds.join(", ").toLowerCase()}, all`);
+              addLine("error", `Unknown kind: ${filterArg}. Valid: ${kinds.join(", ")}, all`);
             }
           }
         }
@@ -163,43 +306,33 @@ export function Terminal({ className }: TerminalProps) {
       }
 
       case "select": {
-        if (args.length < 2) {
-          addLine("error", "Usage: select <partial title>");
+        if (args.length < 2) { addLine("error", "Usage: select <partial title>"); break; }
+        const partial = trimmed.slice(7).toLowerCase();
+        const found = graphData.nodes.find((n) => n.title.toLowerCase().includes(partial));
+        if (found) {
+          selectNode(found);
+          addLine("output", `Selected: [${found.kind}] ${found.title}`);
         } else {
-          const partial = args.slice(1).join(" ");
-          const found = graphData.nodes.find((n) =>
-            n.title.toLowerCase().includes(partial)
-          );
-          if (found) {
-            selectNode(found);
-            addLine("output", `Selected: [${found.kind}] ${found.title}`);
-          } else {
-            addLine("error", `No node found matching "${partial}"`);
-          }
+          addLine("error", `No node matching "${partial}"`);
         }
         break;
       }
 
+      case "live":
+        setLiveEvents((v) => !v);
+        addLine("system", `Live event tail: ${!liveEvents ? "ON" : "OFF"}`);
+        break;
+
       case "reconnect":
-        addLine("output", "Reconnecting...");
-        connect().then(() => {
-          const s = useGraphStore.getState();
-          if (s.status === "connected") {
-            addLine("output", `Connected! v${s.serverInfo?.version ?? "?"} — ${s.graphData.nodes.length} nodes loaded`);
-          } else {
-            addLine("error", `Connection failed: ${s.error ?? "unknown error"}`);
-          }
-        });
+        addLine("system", "Reconnecting...");
+        connect();
         break;
 
       case "history":
         if (history.length === 0) {
-          addLine("output", "No command history");
+          addLine("output", "No history");
         } else {
-          addLine("output", "Recent commands:");
-          history.slice(-5).forEach((h, i) => {
-            addLine("output", `  ${i + 1}. ${h}`);
-          });
+          history.slice(-10).forEach((h, i) => addLine("output", `  ${i + 1}. ${h}`));
         }
         break;
 
@@ -207,10 +340,9 @@ export function Terminal({ className }: TerminalProps) {
         break;
 
       default:
-        addLine("error", `Unknown command: ${command}`);
-        addLine("output", "Type 'help' for available commands");
+        addLine("error", `Unknown: ${command}. Type 'help'`);
     }
-  }, [addLine, history, setFilter, selectNode, graphData, kinds, status, serverInfo, connect, storeSearch]);
+  }, [addLine, history, setFilter, selectNode, graphData, kinds, status, serverInfo, connect, storeSearch, liveEvents, activityLog.length]);
 
   const handleSubmit = useCallback((e: { preventDefault: () => void }) => {
     e.preventDefault();
@@ -283,7 +415,8 @@ export function Terminal({ className }: TerminalProps) {
                   line.type === "input" && "text-primary/80",
                   line.type === "output" && "text-foreground/60",
                   line.type === "error" && "text-red-400/80",
-                  line.type === "system" && "text-muted-foreground/50 italic"
+                  line.type === "system" && "text-muted-foreground/50 italic",
+                  line.type === "event" && "text-muted-foreground/35"
                 )}
               >
                 {line.content}

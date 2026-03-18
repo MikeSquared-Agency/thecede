@@ -30,9 +30,10 @@ interface GraphCanvasProps {
   nodes: CortexNode[];
   edges: CortexEdge[];
   recentEdgeKeys?: string[];
+  highlightedNodeIds?: Set<string> | null;
 }
 
-export function GraphCanvas({ nodes, edges, recentEdgeKeys = [] }: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, recentEdgeKeys = [], highlightedNodeIds = null }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const wobbleRef = useRef<number | null>(null);
@@ -41,6 +42,15 @@ export function GraphCanvas({ nodes, edges, recentEdgeKeys = [] }: GraphCanvasPr
   const tooltipRef = useRef<HTMLDivElement>(null);
   const recentEdgeKeysRef = useRef(recentEdgeKeys);
   recentEdgeKeysRef.current = recentEdgeKeys;
+  // D3 selection refs for search transition animations
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nodeSelRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const linkSelRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const labelSelRef = useRef<any>(null);
+  const simNodesRef = useRef<SimNode[]>([]);
+  const prevHighlightRef = useRef<Set<string> | null>(null);
   const selectNode = useGraphStore((s) => s.selectNode);
   const selectedNode = useGraphStore((s) => s.selectedNode);
   const [d3Loaded, setD3Loaded] = useState(false);
@@ -115,12 +125,12 @@ export function GraphCanvas({ nodes, edges, recentEdgeKeys = [] }: GraphCanvasPr
         .attr("height", height)
         .attr("viewBox", [0, 0, width, height]);
 
-      // Glow filter for high-importance nodes
+      // Subtle glow filter for high-importance nodes
       const defs = svgSel.append("defs");
       const glowFilter = defs.append("filter").attr("id", "node-glow");
       glowFilter
         .append("feGaussianBlur")
-        .attr("stdDeviation", 4)
+        .attr("stdDeviation", 1.5)
         .attr("result", "coloredBlur");
       const feMerge = glowFilter.append("feMerge");
       feMerge.append("feMergeNode").attr("in", "coloredBlur");
@@ -262,6 +272,12 @@ export function GraphCanvas({ nodes, edges, recentEdgeKeys = [] }: GraphCanvasPr
 
       nodeGroup.call(drag as never);
 
+      // Store refs for search transition animations
+      nodeSelRef.current = nodeGroup;
+      linkSelRef.current = linkGroup;
+      labelSelRef.current = labelGroup;
+      simNodesRef.current = simNodes;
+
       const simulation = d3
         .forceSimulation(simNodes)
         .force(
@@ -326,6 +342,160 @@ export function GraphCanvas({ nodes, edges, recentEdgeKeys = [] }: GraphCanvasPr
 
     return () => { cleanup?.(); };
   }, [nodes, edges, selectNode, selectedNode]);
+
+  // ── Search highlight transition ──
+  // 3-phase animation: zoom out → dim non-matches → zoom to results
+  useEffect(() => {
+    if (!svgRef.current || !zoomRef.current) return;
+    if (!nodeSelRef.current || !linkSelRef.current) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const d3 = await import("d3");
+      if (cancelled) return;
+
+      const svg = d3.select(svgRef.current!);
+      const zoom = zoomRef.current!;
+      const width = svgRef.current!.clientWidth;
+      const height = svgRef.current!.clientHeight;
+
+      if (highlightedNodeIds && highlightedNodeIds.size > 0) {
+        prevHighlightRef.current = highlightedNodeIds;
+
+        // Phase 1: Zoom out to reveal full graph
+        svg
+          .transition("search-phase1")
+          .duration(500)
+          .ease(d3.easeCubicOut)
+          .call(
+            zoom.transform as never,
+            d3.zoomIdentity.translate(width / 2, height / 2).scale(0.5)
+          );
+
+        await new Promise((r) => setTimeout(r, 540));
+        if (cancelled) return;
+
+        // Phase 2: Dim non-matching nodes, brighten matched ones
+        nodeSelRef.current
+          .transition("search-phase2")
+          .duration(400)
+          .ease(d3.easeCubicOut)
+          .attr("fill-opacity", (d: SimNode) =>
+            highlightedNodeIds.has(d.id) ? 1 : 0.06
+          )
+          .attr("stroke-opacity", (d: SimNode) =>
+            highlightedNodeIds.has(d.id) ? 1 : 0.03
+          )
+          .attr("r", (d: SimNode) =>
+            highlightedNodeIds.has(d.id)
+              ? getNodeRadius(d.importance) * 1.3
+              : getNodeRadius(d.importance) * 0.6
+          );
+
+        linkSelRef.current
+          .transition("search-phase2")
+          .duration(400)
+          .attr("stroke-opacity", (d: SimEdge) => {
+            const sId =
+              typeof d.source === "string"
+                ? d.source
+                : (d.source as SimNode).id;
+            const tId =
+              typeof d.target === "string"
+                ? d.target
+                : (d.target as SimNode).id;
+            return highlightedNodeIds.has(sId) && highlightedNodeIds.has(tId)
+              ? 0.35
+              : 0.01;
+          });
+
+        if (labelSelRef.current) {
+          labelSelRef.current
+            .transition("search-phase2")
+            .duration(400)
+            .attr("fill-opacity", (d: SimNode) =>
+              highlightedNodeIds.has(d.id) ? 0.9 : 0.03
+            );
+        }
+
+        await new Promise((r) => setTimeout(r, 450));
+        if (cancelled) return;
+
+        // Phase 3: Zoom to fit the highlighted nodes
+        const matchingNodes = simNodesRef.current.filter((n) =>
+          highlightedNodeIds.has(n.id)
+        );
+        if (matchingNodes.length === 0) return;
+
+        const xs = matchingNodes.map((n) => n.x ?? 0);
+        const ys = matchingNodes.map((n) => n.y ?? 0);
+        const pad = 60;
+        const minX = Math.min(...xs) - pad;
+        const maxX = Math.max(...xs) + pad;
+        const minY = Math.min(...ys) - pad;
+        const maxY = Math.max(...ys) + pad;
+        const bboxW = maxX - minX || 1;
+        const bboxH = maxY - minY || 1;
+        const scale = Math.min(width / bboxW, height / bboxH, 4) * 0.85;
+        const cx = (minX + maxX) / 2;
+        const cy = (minY + maxY) / 2;
+
+        svg
+          .transition("search-phase3")
+          .duration(600)
+          .ease(d3.easeCubicInOut)
+          .call(
+            zoom.transform as never,
+            d3.zoomIdentity
+              .translate(width / 2, height / 2)
+              .scale(scale)
+              .translate(-cx, -cy)
+          );
+      } else if (prevHighlightRef.current !== null) {
+        // Search cleared — restore all nodes smoothly
+        prevHighlightRef.current = null;
+
+        nodeSelRef.current
+          .transition("search-restore")
+          .duration(400)
+          .ease(d3.easeCubicOut)
+          .attr("fill-opacity", (d: SimNode) => 0.6 + d.importance * 0.4)
+          .attr("stroke-opacity", (d: SimNode) =>
+            d.importance > 0.8 ? 0.6 : 0.2
+          )
+          .attr("r", (d: SimNode) => getNodeRadius(d.importance));
+
+        linkSelRef.current
+          .transition("search-restore")
+          .duration(400)
+          .attr("stroke-opacity", (d: SimEdge) =>
+            Math.max(0.04, d.weight * 0.15)
+          );
+
+        if (labelSelRef.current) {
+          labelSelRef.current
+            .transition("search-restore")
+            .duration(400)
+            .attr("fill-opacity", 0.7);
+        }
+
+        svg
+          .transition("search-restore-zoom")
+          .delay(200)
+          .duration(500)
+          .ease(d3.easeCubicOut)
+          .call(
+            zoom.transform as never,
+            d3.zoomIdentity.translate(width / 2, height / 2).scale(0.8)
+          );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [highlightedNodeIds]);
 
   return (
     <div ref={containerRef} className="relative size-full graph-bg">

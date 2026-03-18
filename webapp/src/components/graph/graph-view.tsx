@@ -17,20 +17,22 @@ export function GraphView() {
   const selectedNode = useGraphStore((s) => s.selectedNode);
   const status = useGraphStore((s) => s.status);
 
-  // Apply kind filter
-  const kindFiltered = useMemo(
+  // Apply kind filter — always show all kind-filtered nodes in the canvas
+  const displayNodes = useMemo(
     () => filterNodes(graphData.nodes, activeFilter),
     [graphData.nodes, activeFilter]
   );
 
-  // When searching, show only matching nodes (intersected with kind filter)
-  const displayNodes = useMemo(() => {
+  // When searching, compute highlighted IDs for transition animation
+  const highlightedNodeIds = useMemo(() => {
     if (searchResults.length > 0 && searchQuery.trim()) {
-      const kindFilteredIds = new Set(kindFiltered.map((n) => n.id));
-      return searchResults.filter((n) => kindFilteredIds.has(n.id));
+      const kindFilteredIds = new Set(displayNodes.map((n) => n.id));
+      return new Set(
+        searchResults.filter((n) => kindFilteredIds.has(n.id)).map((n) => n.id)
+      );
     }
-    return kindFiltered;
-  }, [kindFiltered, searchResults, searchQuery]);
+    return null;
+  }, [displayNodes, searchResults, searchQuery]);
 
   const displayEdges = useMemo(() => {
     const nodeIds = new Set(displayNodes.map((n) => n.id));
@@ -105,6 +107,7 @@ export function GraphView() {
         nodes={displayNodes}
         edges={displayEdges}
         recentEdgeKeys={recentEdgeKeys}
+        highlightedNodeIds={highlightedNodeIds}
       />
 
       {/* Floating search + filter — top left */}

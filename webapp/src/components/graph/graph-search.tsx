@@ -74,7 +74,7 @@ export function GraphSearch() {
           onChange={(e) => handleSearch(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder="Search graph… ⌘K"
+          placeholder="Search graph…"
           className="flex-1 h-7 bg-transparent font-mono text-[10px] text-foreground/80 placeholder:text-muted-foreground/30 focus:outline-none"
         />
         {localQuery && (

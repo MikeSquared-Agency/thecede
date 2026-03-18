@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -11,13 +11,59 @@ const NAV_ITEMS = [
   { href: "/about", label: "About" },
 ] as const;
 
+const LOGO_TEXT = "> thecede";
+const LOGO_KEEP = 2; // erase stops at "> "
+
+/** Looping typewriter: types → pauses → erases back to LOGO_KEEP → repeats */
+function useLoopingTypewriter(text: string, typeSpeed = 55, pause = 2000, eraseSpeed = 30) {
+  const [displayed, setDisplayed] = useState(text.slice(0, LOGO_KEEP));
+  const phase = useRef<"typing" | "pausing" | "erasing">("typing");
+  const idx = useRef(LOGO_KEEP);
+
+  useEffect(() => {
+    idx.current = LOGO_KEEP;
+    phase.current = "typing";
+    setDisplayed(text.slice(0, LOGO_KEEP));
+
+    const tick = () => {
+      if (phase.current === "typing") {
+        idx.current++;
+        setDisplayed(text.slice(0, idx.current));
+        if (idx.current >= text.length) {
+          phase.current = "pausing";
+          timer = window.setTimeout(tick, pause);
+          return;
+        }
+        timer = window.setTimeout(tick, typeSpeed);
+      } else if (phase.current === "pausing") {
+        phase.current = "erasing";
+        timer = window.setTimeout(tick, eraseSpeed);
+      } else {
+        idx.current--;
+        setDisplayed(text.slice(0, idx.current));
+        if (idx.current <= LOGO_KEEP) {
+          phase.current = "typing";
+          timer = window.setTimeout(tick, typeSpeed * 4);
+          return;
+        }
+        timer = window.setTimeout(tick, eraseSpeed);
+      }
+    };
+
+    let timer = window.setTimeout(tick, typeSpeed);
+    return () => clearTimeout(timer);
+  }, [text, typeSpeed, pause, eraseSpeed]);
+
+  return displayed;
+}
+
 export function CortexHeader() {
   const pathname = usePathname();
   const status = useGraphStore((s) => s.status);
   const graphData = useGraphStore((s) => s.graphData);
   const activeFilter = useGraphStore((s) => s.activeFilter);
-  const serverInfo = useGraphStore((s) => s.serverInfo);
   const connect = useGraphStore((s) => s.connect);
+  const displayed = useLoopingTypewriter(LOGO_TEXT, 80, 2500, 45);
 
   // Auto-connect on mount
   useEffect(() => {
@@ -32,9 +78,9 @@ export function CortexHeader() {
       : graphData.nodes.filter((n) => n.kind === activeFilter).length;
 
   const statusColor =
-    status === "connected" ? "bg-emerald-500" :
+    status === "connected" ? "bg-red-500" :
     status === "connecting" ? "bg-amber-500" :
-    status === "error" ? "bg-red-500" : "bg-zinc-500";
+    status === "error" ? "bg-zinc-600" : "bg-zinc-500";
 
   const statusLabel =
     status === "connected" ? "live" :
@@ -45,16 +91,19 @@ export function CortexHeader() {
     <header className="flex items-center justify-between h-10 px-4 border-b border-border bg-card shrink-0">
       {/* Left: logo + nav */}
       <div className="flex items-center gap-0">
-        <Link href="/" className="flex items-center gap-1.5 pr-4 mr-1 border-r border-border">
-          <span className="text-sm">🧠</span>
-          <span className="font-mono text-[11px] font-semibold text-primary tracking-tight">
-            thecede
+        <Link href="/" className="flex items-center gap-1.5 pr-4 mr-1 border-r border-border group" style={{ width: `${LOGO_TEXT.length + 1}ch` }}>
+          <span
+            className="font-mono text-[13px] font-bold tracking-tight select-none whitespace-nowrap"
+            style={{
+              background: "linear-gradient(90deg, #e879f9, #f472b6, #fb923c)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              textShadow: "0 0 12px rgba(232,121,249,0.3)",
+              letterSpacing: "-0.02em",
+            }}
+          >
+            {displayed}<span className="inline-block w-[2px] h-[12px] bg-fuchsia-400/70 ml-[1px] align-middle" style={{ animation: "blink-caret 1s step-end infinite" }} />
           </span>
-          {serverInfo && (
-            <span className="font-mono text-[9px] text-muted-foreground/50 tracking-tight">
-              v{serverInfo.version}
-            </span>
-          )}
         </Link>
 
         <nav className="flex items-center">
@@ -106,8 +155,8 @@ export function CortexHeader() {
           />
           <span className={cn(
             "font-mono text-[9px] uppercase tracking-[0.1em]",
-            status === "connected" ? "text-emerald-500/80" :
-            status === "error" ? "text-red-500/80" : "text-muted-foreground/60"
+            status === "connected" ? "text-red-500/80" :
+            status === "error" ? "text-zinc-500/80" : "text-muted-foreground/60"
           )}>
             {statusLabel}
           </span>

@@ -7,7 +7,22 @@
 
 import type { CortexNode, CortexEdge, CortexData } from "@/lib/types/cortex";
 
-const BASE_URL = process.env.NEXT_PUBLIC_CORTEX_URL ?? "http://localhost:9091";
+const CORTEX_DIRECT =
+  process.env.NEXT_PUBLIC_CORTEX_URL ?? "http://localhost:9091";
+
+// REST calls go through Next.js API proxy (handles SSR + avoids mixed-content).
+// Must be absolute so `new URL(...)` works for query-param builders.
+const BASE_URL =
+  typeof window !== "undefined"
+    ? `${window.location.origin}/api/cortex`
+    : (process.env.CORTEX_BACKEND_URL ?? CORTEX_DIRECT);
+
+// SSE (EventSource) connects directly to Cortex — the proxy can't relay
+// long-lived streaming responses. CORS on the Cortex server allows this.
+const SSE_URL =
+  typeof window !== "undefined"
+    ? CORTEX_DIRECT
+    : CORTEX_DIRECT;
 
 // ---------- Health & Stats ----------
 
@@ -85,7 +100,11 @@ export async function searchCortex(
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`Cortex /search failed: ${res.status}`);
   const json = await res.json();
-  return normalizeNodes(json.data ?? json.nodes ?? json);
+  const raw = json.data ?? json.nodes ?? json;
+  // Cortex search returns { node: {...}, score, raw_score } wrappers — unwrap them
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const unwrapped = Array.isArray(raw) ? raw.map((r: any) => r.node ?? r) : raw;
+  return normalizeNodes(unwrapped);
 }
 
 // ---------- Graph Export ----------
@@ -149,7 +168,7 @@ export function subscribeEvents(
   onEvent: (event: CortexSSEEvent) => void,
   eventTypes?: string[]
 ): () => void {
-  const url = new URL(`${BASE_URL}/events/stream`);
+  const url = new URL(`${SSE_URL}/events/stream`);
   if (eventTypes?.length) url.searchParams.set("events", eventTypes.join(","));
 
   const source = new EventSource(url.toString());
