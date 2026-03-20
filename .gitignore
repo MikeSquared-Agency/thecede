@@ -20,10 +20,6 @@ watch-cortex.ps1
 # Old/intermediate HTML
 cortex-explorer.html
 cortex-live.html
-lily-cortex-surge.html
-
-# OpenClaw config
-openclaw.json
 
 # WhatsApp QR artifacts
 qr-now.txt

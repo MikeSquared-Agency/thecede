@@ -7,7 +7,7 @@
 
 # thecede
 
-Real-time graph explorer for [Cortex](https://github.com/YOUR_ORG/cortex) — the embedded graph memory engine for AI agents.
+Real-time graph explorer for [Cortex](https://github.com/MikeSquared-Agency/cortex) — the embedded graph memory engine for AI agents.
 
 Watch your agent's knowledge graph grow live: nodes appear, edges auto-link, trust scores shift — all streamed over SSE straight from Cortex.
 
@@ -25,12 +25,12 @@ Watch your agent's knowledge graph grow live: nodes appear, edges auto-link, tru
 ### Prerequisites
 
 - **Node.js ≥ 18.17** (check with `node -v`)
-- **A running Cortex server** — [install guide](https://github.com/YOUR_ORG/cortex#run)
+- **A running Cortex server** — [install guide](https://github.com/MikeSquared-Agency/cortex#run)
 
 ### 1. Clone & install
 
 ```bash
-git clone https://github.com/YOUR_ORG/thecede.git
+git clone https://github.com/MikeSquared-Agency/thecede.git
 cd thecede
 npm install
 ```
@@ -74,7 +74,7 @@ Or with `docker compose` alongside Cortex:
 ```yaml
 services:
   cortex:
-    image: ghcr.io/YOUR_ORG/cortex:latest
+    image: ghcr.io/MikeSquared-Agency/cortex:latest
     ports: ["9091:9091"]
 
   thecede:
