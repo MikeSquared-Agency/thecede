@@ -8,6 +8,7 @@ import { useGraphStore } from "@/lib/stores/graphStore";
 
 const NAV_ITEMS = [
   { href: "/", label: "Graph" },
+  { href: "/chat", label: "Chat" },
   { href: "/about", label: "About" },
 ] as const;
 
